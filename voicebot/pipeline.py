@@ -71,9 +71,13 @@ class VoicePipeline:
 
         # Aggregators are required: they turn the greeting InputTextRawFrame into
         # a user turn (triggering inference) and surface TTS text for logging.
-        pipeline = Pipeline(
-            [self.input, user_agg, self.llm, transcript, self._output, assistant_agg]
-        )
+        pipeline_processors = [self.input, user_agg, self.llm, transcript]
+        if getattr(config, "ENABLE_VOCAL_MASTERING", False):
+            from .dsp import VocalMasteringProcessor
+            pipeline_processors.append(VocalMasteringProcessor(sample_rate=config.RATE_OUT))
+        pipeline_processors.extend([self._output, assistant_agg])
+
+        pipeline = Pipeline(pipeline_processors)
         self.worker = PipelineWorker(
             pipeline,
             params=PipelineParams(
