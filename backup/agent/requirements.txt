@@ -1,0 +1,6 @@
+# Agent dependencies (keep these out of the app's root environment).
+#
+# pipecat-ai[google] pulls the Gemini Live service and its google-genai pin,
+# which is newer than the one used by live_call_sim2.py.
+pipecat-ai[google,local]==1.16.0
+loguru>=0.7.2

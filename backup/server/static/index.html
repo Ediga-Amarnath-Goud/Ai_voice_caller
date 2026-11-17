@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice Calling Assistant — Windows 11 Console</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body class="dark-theme">
+    <!-- Top Bar Navigation & Status -->
+    <header class="app-topbar">
+        <div class="brand-group">
+            <div class="brand-logo" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" y1="19" x2="12" y2="22"></line>
+                </svg>
+            </div>
+            <div class="brand-title">
+                <h1>AI Voice Calling Assistant</h1>
+                <span class="os-badge">Windows 11</span>
+            </div>
+        </div>
+
+        <div class="topbar-status">
+            <span id="connectionPill" class="status-pill disconnected" data-status="disconnected">Disconnected</span>
+            <span id="driverBadge" class="badge driver-badge">Driver: Virtual</span>
+            
+            <div class="audio-devices-group">
+                <div class="device-field">
+                    <label for="audioInputSelect">Mic:</label>
+                    <select id="audioInputSelect" aria-label="Audio Input Device">
+                        <option value="">Detecting inputs...</option>
+                    </select>
+                </div>
+                <div class="device-field">
+                    <label for="audioOutputSelect">Spk:</label>
+                    <select id="audioOutputSelect" aria-label="Audio Output Device">
+                        <option value="">Detecting outputs...</option>
+                    </select>
+                </div>
+                <button id="refreshDevicesBtn" class="btn btn-icon" title="Refresh Audio Devices" aria-label="Refresh Audio Devices">↻</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Dashboard Grid -->
+    <main class="dashboard-grid">
+        <!-- 1. Hero Call Monitor -->
+        <section class="card hero-monitor" aria-label="Active Call Monitor">
+            <div class="hero-top-row">
+                <div class="hero-status-badges">
+                    <span id="callStatePill" class="state-pill state-idle">IDLE</span>
+                    <span id="directionBadge" class="direction-badge direction-idle">IDLE</span>
+                </div>
+                <div class="hero-timer">
+                    <span class="timer-label">DURATION</span>
+                    <span id="callDurationTimer" class="duration-stopwatch">00:00:00</span>
+                </div>
+            </div>
+
+            <div class="hero-caller-profile">
+                <div class="caller-avatar" aria-hidden="true">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                </div>
+                <div class="caller-details">
+                    <div id="callerNameDisplay" class="caller-name">No Active Call</div>
+                    <div id="callerIdDisplay" class="caller-number">—</div>
+                </div>
+            </div>
+
+            <div class="hero-call-controls">
+                <button id="btnAnswerCall" class="btn btn-success">🤖 AI Take Over Call</button>
+                <button id="btnEndCall" class="btn btn-danger" disabled>End Call</button>
+            </div>
+        </section>
+
+        <!-- 2. Dual Waveform Visualizer -->
+        <section id="visualizerContainer" class="card visualizer-card" aria-label="Audio Waveform Visualizers">
+            <div class="visualizer-header">
+                <h2>Live Audio Telemetry</h2>
+                <div class="visualizer-channels">
+                    <div class="channel-indicator cyan">
+                        <span class="dot cyan"></span>
+                        <span class="channel-name">Track 1: Caller (16 kHz)</span>
+                        <span id="callerLevelText" class="level-indicator">RMS: 0.00</span>
+                    </div>
+                    <div class="channel-indicator emerald">
+                        <span class="dot emerald"></span>
+                        <span class="channel-name">Track 2: Gemini Aoede (24 kHz)</span>
+                        <span id="geminiLevelText" class="level-indicator">RMS: 0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="canvas-container">
+                <canvas id="waveformCanvas" class="waveform-canvas" width="800" height="200" aria-label="Dual channel audio waveform visualizer"></canvas>
+                <!-- Compatibility canvases for legacy/E2E test runners -->
+                <canvas id="caller-waveform" class="waveform cyan hidden" width="400" height="100" style="display:none"></canvas>
+                <canvas id="gemini-waveform" class="waveform emerald hidden" width="400" height="100" style="display:none"></canvas>
+            </div>
+        </section>
+
+        <!-- 3. Dual-Column Live Streaming Transcript Panel & Docked Operator Whisper -->
+        <section id="transcriptPanel" class="card transcript-card" aria-label="Live Transcripts and Operator Whisper">
+            <div class="transcript-header">
+                <div class="transcript-title-group">
+                    <h2>Live Streaming Transcripts</h2>
+                    <span id="turnCounterBadge" class="badge">0 turns</span>
+                </div>
+                <div class="transcript-options">
+                    <label class="toggle-control" for="autoscrollToggle">
+                        <input type="checkbox" id="autoscrollToggle" checked>
+                        <span class="toggle-track"></span>
+                        <span class="toggle-text">Auto-scroll</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Scrollable transcript area -->
+            <div id="transcriptContainer" class="transcript-container" role="log" aria-live="polite">
+                <div class="transcript-empty-state">
+                    <div class="empty-icon" aria-hidden="true">💬</div>
+                    <p>No active speech stream.</p>
+                    <small>Incoming caller speech and Gemini Live responses will stream here chunk-by-chunk.</small>
+                </div>
+            </div>
+
+            <!-- Mid-Call Operator Whisper Box -->
+            <div id="whisperPanel" class="whisper-dock">
+                <div class="whisper-dock-header">
+                    <h3>Mid-Call Operator Whisper</h3>
+                    <span class="whisper-hint">Steers Gemini without caller hearing</span>
+                </div>
+
+                <div class="whisper-input-wrapper">
+                    <input type="text" id="whisperInput" name="whisper" placeholder="Whisper silent guidance to Gemini..." autocomplete="off">
+                    <button id="sendWhisperBtn" class="btn btn-primary">Send</button>
+                </div>
+
+                <div id="whisperPresets" class="whisper-chips" aria-label="Quick whisper guidance presets">
+                    <button type="button" class="chip" data-whisper="Ask caller's name">Ask caller's name</button>
+                    <button type="button" class="chip" data-whisper="Take a message">Take a message</button>
+                    <button type="button" class="chip" data-whisper="Owner in meeting">Owner in meeting</button>
+                    <button type="button" class="chip" data-whisper="Offer morning callback">Offer morning callback</button>
+                    <button type="button" class="chip" data-whisper="Wrap up call">Wrap up call</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. Outbound Dialer -->
+        <section class="card dialer-card" aria-label="Outbound Phone Dialer">
+            <div class="card-header">
+                <h2>Outbound Dialer</h2>
+                <span class="badge">Tel / Simulation</span>
+            </div>
+
+            <div class="dialer-inputs">
+                <div class="field-group">
+                    <label for="dialPhoneNumber">Destination Phone Number</label>
+                    <input type="tel" id="dialPhoneNumber" name="phone_number" placeholder="+1 (555) 000-0000" autocomplete="tel">
+                </div>
+
+                <div class="field-group">
+                    <label for="dialGoalPrompt">Task Goal / Gemini Persona Steering</label>
+                    <textarea id="dialGoalPrompt" name="goal_prompt" rows="3" placeholder="Define outbound call goal (e.g. 'Inquire about dental appointment availability and schedule morning callback')..."></textarea>
+                </div>
+            </div>
+
+            <!-- Interactive Keypad -->
+            <div id="dialer-keypad" class="keypad-grid" aria-label="Phone Keypad">
+                <button type="button" class="keypad-btn" data-key="1"><span>1</span></button>
+                <button type="button" class="keypad-btn" data-key="2"><span>2</span><small>ABC</small></button>
+                <button type="button" class="keypad-btn" data-key="3"><span>3</span><small>DEF</small></button>
+                <button type="button" class="keypad-btn" data-key="4"><span>4</span><small>GHI</small></button>
+                <button type="button" class="keypad-btn" data-key="5"><span>5</span><small>JKL</small></button>
+                <button type="button" class="keypad-btn" data-key="6"><span>6</span><small>MNO</small></button>
+                <button type="button" class="keypad-btn" data-key="7"><span>7</span><small>PQRS</small></button>
+                <button type="button" class="keypad-btn" data-key="8"><span>8</span><small>TUV</small></button>
+                <button type="button" class="keypad-btn" data-key="9"><span>9</span><small>WXYZ</small></button>
+                <button type="button" class="keypad-btn" data-key="*"><span>*</span></button>
+                <button type="button" class="keypad-btn" data-key="0"><span>0</span><small>+</small></button>
+                <button type="button" class="keypad-btn" data-key="#"><span>#</span></button>
+            </div>
+
+            <div class="dialer-actions">
+                <button type="button" id="btnKeypadClear" class="btn btn-secondary">Clear</button>
+                <button type="button" id="btnKeypadBackspace" class="btn btn-secondary">⌫ Backspace</button>
+                <button type="button" id="btnStartCall" class="btn btn-success btn-dial">Call Now</button>
+            </div>
+        </section>
+
+        <!-- 5. Call History & Message Center -->
+        <section class="card history-card" aria-label="Call History and Message Center">
+            <div class="history-tabs-header">
+                <div class="tab-buttons" role="tablist">
+                    <button type="button" class="tab-btn active" id="tabBtnMessages" role="tab" aria-selected="true" data-tab="tabMessages">
+                        Messages <span id="messagesCountBadge" class="badge badge-accent">0</span>
+                    </button>
+                    <button type="button" class="tab-btn" id="tabBtnHistory" role="tab" aria-selected="false" data-tab="tabHistory">
+                        Call History <span id="historyCountBadge" class="badge">0</span>
+                    </button>
+                </div>
+                <button id="refreshHistoryBtn" class="btn btn-icon" title="Refresh Records" aria-label="Refresh History Records">↻</button>
+            </div>
+
+            <!-- Tab 1: Message Center -->
+            <div id="tabMessages" class="tab-panel active" role="tabpanel">
+                <div id="messageCenter" class="message-center-list">
+                    <div class="empty-state">No messages captured yet. Messages recorded by Gemini's take_message tool will appear here.</div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Call History -->
+            <div id="tabHistory" class="tab-panel" role="tabpanel" hidden>
+                <div class="history-table-wrapper">
+                    <table id="historyTable" class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Call ID</th>
+                                <th>Direction</th>
+                                <th>Caller</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Started</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyList">
+                            <tr>
+                                <td colspan="6" class="table-empty">No past calls found.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Inbound Call Approval Modal -->
+    <dialog id="inboundModal" class="inbound-modal" aria-labelledby="inboundModalTitle" aria-modal="true">
+        <div class="modal-content">
+            <div class="ringing-animation" aria-hidden="true">
+                <div class="ring-circle outer"></div>
+                <div class="ring-circle middle"></div>
+                <div class="ring-circle inner">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <h2 id="inboundModalTitle">Incoming Phone Call</h2>
+            <div class="inbound-caller-card">
+                <div id="inboundCallerName" class="inbound-name">Unknown Caller</div>
+                <div id="inboundCallerId" class="inbound-number">+1 (555) 000-0000</div>
+            </div>
+
+            <p class="inbound-modal-prompt">Choose how to handle this inbound call:</p>
+
+            <div class="inbound-actions">
+                <button type="button" id="btnAiTakeover" class="btn btn-action-ai" value="ai_takeover">
+                    <span class="btn-icon">🤖</span>
+                    <span class="btn-text">AI Take Over</span>
+                </button>
+                <button type="button" id="btnAnswerPersonally" class="btn btn-action-personal" value="answer_personally">
+                    <span class="btn-icon">👤</span>
+                    <span class="btn-text">Answer Personally</span>
+                </button>
+                <button type="button" id="btnDeclineCall" class="btn btn-action-decline" value="decline">
+                    <span class="btn-icon">❌</span>
+                    <span class="btn-text">Decline</span>
+                </button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Global Floating Toast Notification Container -->
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+    <!-- Frontend ES6 Script -->
+    <script src="/static/app.js"></script>
+</body>
+</html>
