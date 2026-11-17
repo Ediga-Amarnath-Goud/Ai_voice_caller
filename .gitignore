@@ -32,6 +32,9 @@ env/
 venv/
 ENV/
 
+# Legacy / backup archives
+backup/
+
 # Large audio captures / recordings
 *.wav
 *.mp3
@@ -40,9 +43,13 @@ ENV/
 *.log
 voicebot.log
 
-# Dynamic routing state files
+# Dynamic routing & connection state files
 .voicebot_routing.json
 .audio_routing.json
+.adb_endpoint
+
+# Zip files
+*.zip
 
 # IDE / Editor
 .vscode/
